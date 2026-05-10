@@ -1,498 +1,332 @@
-# Bluesky Custom Media Feed - LLM Context Reference
+# Bluesky Custom Media Feed — LLM Context Reference
 
 ## Project Overview
 
-**Bluesky Custom Media Feed** is a full-stack web application that creates a personalized Bluesky feed filtered to show only:
-1. **Media posts** (images, videos, external media)
-2. **From followed accounts** (accounts the user follows)
-3. **Including reposts** (reposts/reblogs of media from followed accounts)
+**Bluesky Custom Media Feed** is a full-stack web application (also packaged as a self-contained Linux AppImage) that creates a personalized Bluesky feed filtered to show only:
 
-**Tech Stack**: Node.js + Express (Backend) | React 18 + Vite (Frontend) | @atproto/api (Bluesky Integration)
+1. **Media posts** — images, videos, external links with thumbnails
+2. **From followed accounts** — accounts the authenticated user follows
+3. **Including reposts** — reposts of media content made by followed accounts
 
----
+**GitHub**: https://github.com/Tamalero/PersonalBlueSkyFeed
 
-## Architecture Overview
-
-```
-BlueSkyFeed (Root)
-├── backend/                 # Node.js Express API Server (Port 5000)
-│   ├── server.js           # Main application logic
-│   ├── package.json        # Dependencies
-│   ├── .env.example        # Configuration template
-│   └── node_modules/       # Installed packages
-│
-├── frontend/               # React + Vite Web App (Port 3000)
-│   ├── main.jsx           # React entry point
-│   ├── App.jsx            # Main app component with auto-login
-│   ├── index.html         # HTML template
-│   ├── vite.config.js     # Build configuration
-│   ├── package.json       # Dependencies
-│   ├── components/        # Reusable React components
-│   │   ├── LoginForm.jsx  # Login form (fallback)
-│   │   ├── FeedDisplay.jsx # Feed grid layout
-│   │   └── PostCard.jsx   # Individual post card
-│   └── [various .css files]
-│
-├── .github/
-│   └── copilot-instructions.md  # Development instructions
-│
-├── .vscode/
-│   └── tasks.json         # VS Code build tasks
-│
-├── credentials.txt        # User credentials (handle + app password)
-├── README.md             # User-facing documentation
-├── setup.sh              # Quick setup script
-└── .gitignore            # Git ignore rules
-```
+**Tech Stack**: Node.js + Express (Backend) | React 18 + Vite (Frontend) | Electron 30 (Desktop) | @atproto/api (Bluesky)
 
 ---
 
-## Key Features & Implementation
+## Directory Structure
 
-### 1. **Secure Authentication**
-- Uses Bluesky App Passwords (never main password)
-- Credentials stored in `credentials.txt` (format: `handle: X` and `app: Y`)
-- Backend handles all authentication with `@atproto/api` library
-- Two auth methods: Auto-login (from file) and manual login (form)
-
-### 2. **Feed Filtering Logic** (backend/server.js)
-
-**Helper Functions:**
-- `hasMedia(post)` - Detects posts with images, videos, or external media
-  - Checks `post.embed.$type` for: `app.bsky.embed.images`, `app.bsky.embed.video`, `app.bsky.embed.external`
-  - Returns `true` only if embed exists and contains media
-
-- `isRepost(post)` - Identifies reposts
-  - Checks if `post.reason.$type === 'app.bsky.feed.defs#reasonRepost'`
-
-- `getAuthorUri(post)` - Gets the actual author (handles reposts)
-  - If repost: returns `post.reason.by.did`
-  - If original: returns `post.author.did`
-
-**Feed Filtering Algorithm:**
-1. Fetch user's followed accounts via `agent.getProfile({})`
-2. Fetch timeline with `agent.getTimeline({ limit: 100 })`
-3. Filter each post:
-   - Must have media (via `hasMedia()`)
-   - Author must be in user's follows list
-4. Return filtered feed as JSON array
-
-### 3. **Auto-Login Flow**
-- Frontend (`App.jsx`) calls `/api/auto-login` on mount
-- Backend reads `credentials.txt`, extracts handle + app password
-- Logs in automatically, frontend fetches feed
-- Falls back to manual login form if auto-login fails
-
-### 4. **API Endpoints**
-
-**POST `/api/auto-login`**
-- Reads credentials from `credentials.txt`
-- Returns: `{ success: true, handle: "..." }`
-- No request body needed
-
-**POST `/api/login`**
-- Manual login fallback
-- Request: `{ handle: "...", password: "..." }`
-- Returns: `{ success: true, message: "..." }`
-
-**GET `/api/feed`**
-- Requires authentication (agent must be logged in)
-- Returns: `{ feed: [{ post: {...}, reason: null|{...} }, ...] }`
-- Each item has:
-  - `post`: Full post object with embed info
-  - `reason`: Repost metadata (null if original post)
-
-**POST `/api/logout`**
-- Clears authenticated session
-- Returns: `{ success: true, message: "..." }`
-
-**GET `/api/health`**
-- Simple health check
-- Returns: `{ status: "ok" }`
-
----
-
-## Frontend Components
-
-### **App.jsx** (Main Component)
 ```
-Responsibilities:
-- Auto-login on mount (tries /api/auto-login)
-- Manage authentication state (isAuthenticated)
-- Manage feed data (feed array)
-- Handle loading states
-- Switch between login form and feed display
-```
-
-Props/State:
-- `isAuthenticated` - Boolean, true after login
-- `feed` - Array of feed items
-- `loading` - Boolean, true while fetching
-- `autoLoginError` - String or null
-
-Methods:
-- `autoLogin()` - Attempts auto-login, sets state on success/failure
-- `fetchFeed()` - Calls `/api/feed`, updates state
-- `handleLoginSuccess()` - Sets authenticated state, fetches feed
-- `handleLogout()` - Calls `/api/logout`, clears state
-
-### **LoginForm.jsx** (Fallback Login)
-```
-Props:
-- onLoginSuccess(callback) - Called after successful login
-- error (optional) - Error message from auto-login attempt
-
-Features:
-- Handle/email input
-- Password input with security notes
-- Error message display
-- Loading state during submission
-```
-
-### **FeedDisplay.jsx** (Feed Container)
-```
-Props:
-- feed (array) - Array of feed items
-- loading (boolean) - Show loading state
-
-Shows:
-- Grid of PostCard components if posts exist
-- Empty state message if no posts
-- Loading spinner during fetch
-```
-
-### **PostCard.jsx** (Individual Post)
-```
-Props:
-- post (object) - Post data
-- reason (object|null) - Repost metadata
-
-Features:
-- Display media thumbnail
-- Show video badge for videos
-- Show repost badge if reposted
-- Author info with avatar
-- Post text snippet
-- Stats (likes, replies, reposts)
-- Direct link to Bluesky
-- Responsive grid layout
+BlueSkyFeed/
+├── backend/
+│   ├── server.js           # Express API + feed filtering logic
+│   ├── package.json        # Backend-only deps (used for dev)
+│   └── .env.example        # Optional env var template
+│
+├── frontend/
+│   ├── main.jsx            # React entry point
+│   ├── App.jsx             # Root component — auth, feed state, infinite scroll
+│   ├── App.css
+│   ├── index.html
+│   ├── index.css
+│   ├── vite.config.js      # Dev server on :3000, proxies /api to :5000
+│   ├── package.json
+│   └── components/
+│       ├── LoginForm.jsx   # Manual login fallback
+│       ├── LoginForm.css
+│       ├── FeedDisplay.jsx # Feed grid + IntersectionObserver infinite scroll
+│       ├── FeedDisplay.css
+│       ├── PostCard.jsx    # Individual post card
+│       └── PostCard.css
+│
+├── electron/
+│   └── main.js             # Electron main process: runs Express in-process,
+│                           # creates BrowserWindow, manages auto-updates
+│
+├── package.json            # ROOT — electron-builder config, all bundled deps,
+│                           # build/release scripts
+├── credentials.txt         # NOT committed — handle + app password for auto-login
+├── CONTEXT.md              # This file
+├── README.md
+├── setup.sh
+└── .gitignore
 ```
 
 ---
 
-## Backend Implementation Details
+## Running in Development Mode
 
-### **Media Detection Logic**
-```javascript
-// Handles three types of media:
-1. Images: embed.$type === 'app.bsky.embed.images'
-2. Videos: embed.$type === 'app.bsky.embed.video'
-3. External: embed.$type === 'app.bsky.embed.external' (with thumbnail)
+**Terminal 1 — Backend** (port 5000):
+```bash
+cd backend
+npm install
+npm start
 ```
 
-### **Follow-Based Filtering**
-```javascript
-// User's follows come from:
-const followsDid = userProfile.follows
-// This is an array of follow objects with .did properties
-
-// Check if post author is in follows:
-const isFromFollowed = followsDid.some(follow => follow.did === authorDid)
+**Terminal 2 — Frontend** (port 3000, proxies /api to backend):
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-### **Repost Handling**
-```javascript
-// Original posts vs reposts handled transparently:
-if (isRepost(post)) {
-  authorDid = post.reason.by.did  // Get reposter's ID
-} else {
-  authorDid = post.author.did     // Get author's ID
-}
-// Both filtered the same way - shows media regardless of source
+Open `http://localhost:3000`. Vite proxies all `/api/*` requests to `:5000`.
+
+---
+
+## Building and Releasing the AppImage
+
+### One-time setup
+```bash
+# Install root deps (Electron + electron-builder + electron-updater)
+npm install
 ```
+
+### Build AppImage locally (no upload)
+```bash
+npm run dist
+# Output: dist-electron/Bluesky Media Feed-1.0.0.AppImage
+```
+
+### Publish a new release (triggers auto-updates for existing users)
+```bash
+# Requires a GitHub personal access token with `repo` scope
+export GH_TOKEN=ghp_your_token_here
+
+# 1. Bump version (updates package.json, creates a git tag)
+npm version patch   # or: minor | major
+
+# 2. Build AppImage + upload to GitHub Releases
+npm run release
+```
+
+`npm run release` builds the frontend, packages the AppImage, and publishes two assets to the GitHub Release:
+- `Bluesky.Media.Feed-x.y.z.AppImage` — the binary
+- `latest-linux.yml` — the update manifest that running instances check
 
 ---
 
 ## Credentials System
 
-**File**: `credentials.txt` (root directory)
+**File**: `credentials.txt` in the project root (dev) or `~/.config/BlueSkyFeed/credentials.txt` (AppImage).
 
 **Format**:
 ```
-handle: tamalero.bsky.social
-app: qp6w-auc4-2g6m-moma
+handle: your.handle.bsky.social
+app: xxxx-xxxx-xxxx-xxxx
 ```
 
-**Security Notes**:
-- App password ≠ main Bluesky password
-- Created at https://bsky.app/settings/app-passwords
-- Only backend reads this file
-- Add to `.gitignore` to prevent accidental commits
-- In production, use environment variables instead
+- `handle` — your Bluesky handle or email
+- `app` — an App Password created at https://bsky.app/settings/app-passwords (NOT your main password)
+
+The file is excluded from git via `.gitignore`. In the packaged AppImage, `electron/main.js` sets `CREDENTIALS_PATH` to the OS user-data directory (`~/.config/BlueSkyFeed/`) before starting the server, so credentials survive app updates. The manual login form is always available as a fallback.
 
 ---
 
-## Running the Application
+## API Endpoints
 
-### **Terminal 1 - Backend**
-```bash
-cd backend
-npm start
-# Runs on http://localhost:5000
-```
+### `POST /api/auto-login`
+Reads `credentials.txt` (path from `CREDENTIALS_PATH` env var or `../credentials.txt`).
+- **Response**: `{ success: true, handle: "..." }`
+- **Error**: `{ error: "..." }` with status 400 or 401
 
-### **Terminal 2 - Frontend**
-```bash
-cd frontend
-npm run dev
-# Runs on http://localhost:3000 with hot reload
-# Vite configured to proxy /api requests to backend
-```
+### `POST /api/login`
+Manual login fallback.
+- **Request**: `{ handle: "...", password: "..." }`
+- **Response**: `{ success: true, message: "..." }`
 
-### **VS Code Build Task**
-```bash
-Ctrl+Shift+B (or Cmd+Shift+B on Mac)
-Select "Full Stack: Start Both Servers"
-# Runs both backend and frontend in parallel
-```
+### `GET /api/feed?cursor=<optional>`
+Fetches and filters the timeline. Loops through up to 5 Bluesky timeline pages (100 posts each) until 20 filtered results are collected, then returns with the next cursor.
+- **Response**: `{ feed: [...feedItems], cursor: "..." | null }`
+- Each `feedItem`: `{ post: {...}, reason: null | { $type, by: {...} } }`
+- `cursor: null` means no more posts available
 
----
+### `POST /api/logout`
+Clears the session and the follows cache.
+- **Response**: `{ success: true, message: "..." }`
 
-## Development Workflow
-
-### **Making API Changes**
-1. Edit `/backend/server.js`
-2. Backend auto-restarts (if using nodemon)
-3. Frontend proxy automatically uses new endpoints
-
-### **Making Frontend Changes**
-1. Edit React files in `/frontend`
-2. Vite hot-reloads automatically
-3. No need to restart
-
-### **Adding New Feed Filters**
-1. Add helper function in `server.js` (e.g., `filterByDate()`)
-2. Add to filtering logic in `/api/feed` endpoint
-3. Test by calling endpoint
-
-### **Testing Feed Logic**
-1. Backend logs fetch attempts
-2. Check browser console for frontend errors
-3. Network tab shows API responses
+### `GET /api/health`
+- **Response**: `{ status: "ok" }`
 
 ---
 
-## Common Scenarios & Solutions
+## Backend Implementation — Key Details
 
-### **Scenario 1: Auto-login fails**
-- Check `credentials.txt` format
-- Verify handle and app password are correct
-- Ensure app password hasn't been revoked on Bluesky
-- Frontend falls back to manual login form
-- Check backend console for error details
+### `hasMedia(post)`
+Checks `post.embed.$type` for **view** embed types (the `#view` suffix is what the timeline API actually returns — the record types without `#view` only appear in raw AT Protocol records):
+- `app.bsky.embed.images#view` — checks `images.length > 0`
+- `app.bsky.embed.video#view` — always true
+- `app.bsky.embed.external#view` — checks `external.thumb` exists
 
-### **Scenario 2: Empty feed**
-- User may not follow accounts with media posts
-- Post embeds may not be recognized by `hasMedia()`
-- Check backend `/api/feed` response in DevTools
-- Verify `followsDid` is populated correctly
+### `isRepost(feedItem)` / `getFilterAuthorDid(feedItem)`
+`reason` lives on the **feed item**, not on `feedItem.post`. This is a common AT Protocol mistake.
+- Repost: `feedItem.reason.$type === 'app.bsky.feed.defs#reasonRepost'`
+- For reposts, the DID to filter against is `feedItem.reason.by.did` (the followed account who reposted)
+- For originals, it is `feedItem.post.author.did`
 
-### **Scenario 3: Port conflicts**
-- Backend (5000): Kill with `kill $(lsof -t -i:5000)`
-- Frontend (3000): Kill with `kill $(lsof -t -i:3000)`
-- Or change in `.env` / `vite.config.js`
+### Follows Caching (`getFollowsSet()`)
+`agent.getProfile()` does NOT return a follows list — it only returns counts. Follows are fetched via the paginated `agent.getFollows()` endpoint and cached in-memory for 5 minutes. Cache is cleared on logout.
 
-### **Scenario 4: CORS errors**
-- Backend has `app.use(cors())` enabled
-- Vite proxy configured for `/api` requests
-- If still failing, check network tab for actual error
+### Infinite Scroll Pagination
+The `/api/feed` endpoint accepts a `cursor` query parameter (the opaque cursor from the previous response) and loops through up to 5 Bluesky timeline pages (up to 500 raw posts) to accumulate 20 filtered results. This guarantees a reasonable number of visible posts even if the timeline is sparse with media.
 
----
+### Static File Serving (Production / Electron)
+When `NODE_ENV=production`, Express serves `frontend/dist/` as static files and catches all non-API routes with `index.html`. This means Electron only needs one port (5000) — no separate Vite dev server.
 
-## State Flow Diagram
-
-```
-App Component Mount
-        ↓
-   Auto-login Called
-        ↓
-    [Two paths]
-    ├→ Success → Set isAuthenticated=true → Fetch Feed → Show Feed
-    └→ Fail    → Show LoginForm (with error message)
-        ↓
-   [Manual Login if needed]
-        ↓
-   Set isAuthenticated=true → Fetch Feed → Show Feed
-        ↓
-   User clicks Refresh → Fetch Feed → Update Feed Array
-        ↓
-   User clicks Logout → Clear Session → Show LoginForm
-```
+### CORS
+CORS middleware is only applied in development (`NODE_ENV !== 'production'`), restricted to `http://localhost:3000`. In production, same-origin requests from the Electron window need no CORS headers.
 
 ---
 
-## Key Files to Modify for Common Tasks
+## Frontend Implementation — Key Details
 
-| Task | File | Key Method/Section |
-|------|------|-------------------|
-| Change filter logic | `backend/server.js` | `/api/feed` endpoint, filtering loop |
-| Add new login method | `backend/server.js` | Add new `app.post()` endpoint |
-| Modify UI layout | `frontend/App.jsx` | JSX structure |
-| Add new component | `frontend/components/` | Create `.jsx` and corresponding `.css` |
-| Change styling | `frontend/components/*.css` | Edit CSS classes |
-| Add environment variables | `backend/.env` | Add key=value pairs |
-| Modify feed request | `frontend/App.jsx` | `fetchFeed()` method |
-| Change post display | `frontend/components/PostCard.jsx` | JSX and CSS |
+### `App.jsx`
+State:
+- `isAuthenticated` — boolean
+- `feed` — array of feed items
+- `loading` — boolean, true during initial fetch / refresh
+- `loadingMore` — boolean, true during infinite scroll page loads
+- `cursor` — opaque string from last API response, `null` when exhausted
+- `hasMore` — boolean, false when cursor is null
+- `autoLoginError` — string or null
+- `feedError` — string or null (replaces the old `alert()` calls)
 
----
+Key methods:
+- `autoLogin()` — called on mount, POSTs to `/api/auto-login`, falls back to LoginForm
+- `fetchFeed()` — initial / refresh: resets cursor, replaces feed array
+- `loadMore()` — appends next page using current cursor
+- `handleLogout()` — POSTs to `/api/logout`, clears all state
 
-## Environment & Dependencies
+### `FeedDisplay.jsx`
+Sets up a single `IntersectionObserver` (created once, stable) watching a sentinel `<div>` appended after the grid. The observer fires `onLoadMore()` when the sentinel enters the viewport with a 300px lookahead. A `useRef` holds the latest `onLoadMore` callback so the observer never needs to be recreated when state changes.
 
-### **Backend Dependencies**
-- `express` - HTTP server
-- `cors` - Cross-Origin Resource Sharing
-- `dotenv` - Environment variables
-- `@atproto/api` - Official Bluesky API client
+### `PostCard.jsx`
+- Uses `#view` embed type strings to match what the timeline API returns
+- Avatar fallback: `/default-avatar.png` when `post.author.avatar` is null
+- Truncates post text only when it exceeds 100 characters (previously always appended `...`)
+- Date from `post.record.createdAt` (the correct field; `post.createdAt` doesn't exist on the post object)
 
-### **Frontend Dependencies**
-- `react` - UI library
-- `react-dom` - DOM rendering
-- `vite` - Build tool & dev server
-- `@vitejs/plugin-react` - React plugin for Vite
-
-### **Environment Variables** (Optional)
-```
-PORT=5000 (backend server port)
-BLUESKY_SERVICE_URL=https://bsky.social (Bluesky API endpoint)
-```
+### `LoginForm.jsx`
+- `useEffect` syncs the `initialError` prop into local `error` state so re-renders from the parent correctly update the displayed error
 
 ---
 
-## Production Considerations
+## Electron AppImage — Key Details
 
-1. **Credentials Storage**: Replace `credentials.txt` with environment variables
-2. **Session Management**: Implement proper session/database storage
-3. **HTTPS**: Enable HTTPS in production
-4. **Rate Limiting**: Add rate limiting to API endpoints
-5. **Error Logging**: Implement proper logging system
-6. **Frontend Build**: Run `npm run build` in frontend for optimized dist/
-7. **Backend**: Add authentication middleware to protect endpoints
-8. **Caching**: Implement feed caching to reduce API calls
+### `electron/main.js`
+- Sets `CREDENTIALS_PATH` and `NODE_ENV=production` before requiring `backend/server.js`
+- Requires the Express server in-process (no child process / fork needed — Electron's main process is Node.js)
+- Polls `GET /api/health` every 100 ms until the server is ready, then opens the `BrowserWindow`
+- Auto-updater is only initialized when `app.isPackaged` is true (skipped in dev / `electron:dev`)
+
+### Auto-Update Flow (`electron-updater`)
+On launch (after 3 seconds):
+1. `autoUpdater.checkForUpdates()` fetches `latest-linux.yml` from the GitHub release
+2. If a newer version exists, a native dialog asks the user to download
+3. Download runs in the background
+4. On completion, a second dialog asks to restart
+5. `autoUpdater.quitAndInstall()` replaces the current AppImage file and restarts
+
+`autoDownload: false` ensures the user is always asked before bandwidth is consumed.
+
+### `package.json` (root) — electron-builder config
+```json
+"publish": [{ "provider": "github", "owner": "Tamalero", "repo": "PersonalBlueSkyFeed" }]
+```
+`electron-builder` uses this to know where to upload and where running instances should check for updates. The `latest-linux.yml` update manifest is always published alongside the AppImage binary.
+
+Files bundled into the AppImage:
+- `electron/main.js`
+- `backend/server.js` + `backend/package.json`
+- `frontend/dist/**` (built React app)
+- Root `node_modules/` (all production dependencies)
+- Backend's own `node_modules/` is excluded (`!backend/node_modules/**/*`) — Node.js resolves packages up the directory tree to root `node_modules/`
+
+---
+
+## Bug Fixes Applied (vs. Original Code)
+
+| # | Bug | Fix |
+|---|-----|-----|
+| 1 | `agent.getProfile()` was called expecting a `follows` array — it never returns one. Feed was always empty. | Replaced with paginated `agent.getFollows()` loop stored in a `Set` |
+| 2 | `hasMedia()` checked for `app.bsky.embed.images` (record type). Timeline returns `app.bsky.embed.images#view` (view type). Media was never detected. | Updated all three embed type strings to include `#view` suffix |
+| 3 | `isRepost()` and `getAuthorUri()` were passed `feedItem.post`. The `reason` field lives on `feedItem`, not `feedItem.post` — repost detection always returned false. | Refactored both helpers to receive `feedItem` directly |
+| 4 | `credentials.txt` parser used `split(':')` — would silently truncate values containing colons | Switched to `indexOf(':')` + `slice()` |
+| 5 | `alert()` used for feed errors — blocks the thread, terrible UX | Replaced with `feedError` state rendered inline |
+| 6 | Post text always had `...` appended regardless of length | Added length check before truncation |
+| 7 | `post.author.avatar` can be `null` — caused broken image icons | Added fallback to `/default-avatar.png` |
+| 8 | `LoginForm` ignored prop changes after mount (stale `useState` init) | Added `useEffect` to sync `initialError` prop into state |
+| 9 | CORS was `app.use(cors())` — allowed all origins | Restricted to `localhost:3000` in dev, disabled in production |
+| 10 | Comment contained Cyrillic `г` in "reblог" — Unicode homograph | Fixed to Latin `g` |
+| 11 | `getAuthorUri` was a misleading name — it returned the reposter's DID, not the original author | Renamed to `getFilterAuthorDid` with an explanatory comment |
+
+---
+
+## Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `5000` | Express server port |
+| `BLUESKY_SERVICE_URL` | `https://bsky.social` | Bluesky AT Protocol endpoint |
+| `CREDENTIALS_PATH` | `../credentials.txt` (relative to backend/) | Full path to credentials file; set by Electron to `~/.config/BlueSkyFeed/credentials.txt` |
+| `NODE_ENV` | — | Set to `production` by Electron before requiring server; enables static file serving and disables CORS |
+| `GH_TOKEN` | — | GitHub token with `repo` scope; required only when running `npm run release` |
 
 ---
 
 ## Bluesky API Reference
 
-**@atproto/api Classes & Methods:**
-
 ```javascript
-// Create agent
-const agent = new BskyAgent({ service: 'https://bsky.social' })
+const agent = new BskyAgent({ service: 'https://bsky.social' });
+await agent.login({ identifier: 'handle', password: 'app-password' });
 
-// Login
-await agent.login({ identifier: 'handle', password: 'password' })
+// Get paginated follows list
+const { data } = await agent.getFollows({ actor: agent.session.did, cursor });
+// data.follows = [{ did, handle, displayName, ... }]
+// data.cursor = next page cursor or undefined
 
-// Get user profile with follows
-const profile = await agent.getProfile({})
-// profile.follows = array of follow objects with .did property
+// Get timeline page
+const { data } = await agent.getTimeline({ limit: 100, cursor });
+// data.feed = array of feedItems
+// data.cursor = next page cursor or undefined
 
-// Get timeline
-const { data } = await agent.getTimeline({ limit: 100 })
-// data.feed = array of feed items
-
-// Post structure
-post.uri              // Unique identifier
-post.author.handle    // Username
-post.author.did       // Decentralized ID
-post.author.avatar    // Avatar URL
-post.record.text      // Post text content
-post.embed            // Embedded media (if any)
-post.createdAt        // ISO timestamp
-post.likeCount        // Number of likes
-post.replyCount       // Number of replies
-post.repostCount      // Number of reposts
-
-// Embed types
-post.embed.$type
-// - app.bsky.embed.images      (images)
-// - app.bsky.embed.video        (video)
-// - app.bsky.embed.external     (external links)
-
-// Repost detection
-post.reason?.$type === 'app.bsky.feed.defs#reasonRepost'
-post.reason.by.did  // Reposter's DID
+// feedItem structure:
+feedItem.post.uri              // "at://did:.../app.bsky.feed.post/..."
+feedItem.post.author.did       // author DID
+feedItem.post.author.handle
+feedItem.post.author.avatar    // URL or null
+feedItem.post.author.displayName
+feedItem.post.record.text      // post text content
+feedItem.post.record.createdAt // ISO timestamp (correct field)
+feedItem.post.embed            // embedded media view object (or undefined)
+feedItem.post.embed.$type      // 'app.bsky.embed.images#view' | 'app.bsky.embed.video#view' | 'app.bsky.embed.external#view' | ...
+feedItem.post.likeCount
+feedItem.post.replyCount
+feedItem.post.repostCount
+feedItem.reason                // null for originals; repost metadata object for reposts
+feedItem.reason.$type          // 'app.bsky.feed.defs#reasonRepost'
+feedItem.reason.by.did         // DID of the account who reposted
 ```
-
----
-
-## File Size & Performance Notes
-
-- Frontend bundle: ~50KB (React + Vite optimized)
-- Backend: Lightweight Express server
-- Feed limit: 100 posts per request (configurable)
-- No database: In-memory session (restart clears)
-- CSS: Responsive grid, minimal animations
-
----
-
-## Common Debugging Commands
-
-```bash
-# Check if backend is running
-curl http://localhost:5000/api/health
-
-# Check backend logs (in terminal running backend)
-# Errors appear in real-time
-
-# Check frontend console
-# Browser DevTools > Console tab
-
-# Test API endpoint directly
-curl -X GET http://localhost:5000/api/feed \
-  -H "Authorization: Bearer ..." 
-# (Won't work without auth, use actual token)
-
-# List open ports
-lsof -i :5000  # Backend
-lsof -i :3000  # Frontend
-```
-
----
-
-## Version & Date
-
-- **Created**: May 9, 2026
-- **Latest Updated**: May 9, 2026
-- **Node Version**: 16+
-- **React Version**: 18
-- **Vite Version**: 4.3.0
 
 ---
 
 ## Notes for LLMs
 
-1. **Session is in-memory**: Restarting backend logs out current user
-2. **Credentials file**: Required for auto-login, format is strict
-3. **Feed filtering is client-agnostic**: Works with any Bluesky client
-4. **CORS enabled by default**: Safe for local development
-5. **No database**: Stateless backend except for session
-6. **Vite proxy**: Seamlessly forwards `/api/*` to backend
-7. **Error handling**: Both frontend and backend provide useful error messages
-8. **Responsive design**: Mobile-friendly CSS grid layout
-9. **Component architecture**: Each component has single responsibility
-10. **API is REST**: Standard HTTP methods, JSON responses
+1. **Embed types always have `#view` suffix** in timeline/feed API responses. The bare types (e.g. `app.bsky.embed.images`) only appear in raw AT Protocol records, not in `getTimeline()` output.
+2. **`reason` is on the feed item**, not on `feedItem.post`. `feedItem.post.reason` is always `undefined`.
+3. **`getProfile()` never returns follows**. Use `getFollows()` with pagination.
+4. **Session is in-memory** — restarting the backend logs out the current user and clears the follows cache.
+5. **No database** — the backend is stateless except for the in-memory `agent` and follows cache.
+6. **Credentials path differs between dev and AppImage**: dev uses `../credentials.txt` (root of repo), AppImage uses `~/.config/BlueSkyFeed/credentials.txt`.
+7. **Vite proxy** — in dev, Vite on `:3000` proxies `/api/*` to Express on `:5000`. In production (AppImage), Express serves the built frontend directly on `:5000` — no Vite.
+8. **Auto-updater only runs when `app.isPackaged`** — it is skipped entirely in dev mode.
+9. **AppImage type 2** — produced by default by `electron-builder`. Requires FUSE on the host system.
+10. **Publishing a release** requires `GH_TOKEN` env var and `npm version` to be run first to bump the version tag.
 
 ---
 
-## Future Enhancement Opportunities
+## Version History
 
-- [ ] Database integration (PostgreSQL/MongoDB)
-- [ ] User preferences/settings storage
-- [ ] Advanced filtering (date range, media type toggle)
-- [ ] Dark mode
-- [ ] Export feed as RSS
-- [ ] Caching layer with Redis
-- [ ] Multiple user support
-- [ ] Feed scheduling
-- [ ] Desktop app (Electron)
-- [ ] Mobile app (React Native)
+| Version | Date | Notes |
+|---------|------|-------|
+| 1.0.0 | 2026-05-09 | Initial release — media feed with infinite scroll, Electron AppImage, auto-updates |
