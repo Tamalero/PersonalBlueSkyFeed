@@ -52,10 +52,17 @@ function createWindow() {
 }
 
 function setupAutoUpdater(win) {
+  // electron-updater reads the GitHub repo from the app-update.yml bundled by
+  // electron-builder (generated from the "publish" field in package.json).
+  // No setFeedURL needed — the GitHub provider handles URL construction correctly.
   autoUpdater.autoDownload = false;
-  autoUpdater.setFeedURL({
-    provider: 'generic',
-    url: 'https://github.com/Tamalero/PersonalBlueSkyFeed/releases/latest/download',
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Auto-updater: checking for updates…');
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('Auto-updater: already on the latest version');
   });
 
   autoUpdater.on('update-available', (info) => {
