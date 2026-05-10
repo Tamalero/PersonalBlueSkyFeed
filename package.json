@@ -1,6 +1,6 @@
 {
   "name": "bluesky-media-feed",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Custom Bluesky media feed — images and videos from accounts you follow",
   "main": "electron/main.js",
   "scripts": {
