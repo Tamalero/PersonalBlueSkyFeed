@@ -1,0 +1,14 @@
+node_modules/
+credentials.txt
+.env
+.DS_Store
+dist/
+build/
+dist-electron/
+frontend/dist/
+*.log
+npm-debug.log*
+.vscode/
+.idea/
+.env.local
+.env.*.local

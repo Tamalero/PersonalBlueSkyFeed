@@ -1,0 +1,41 @@
+{
+  "name": "bluesky-media-feed",
+  "version": "1.0.0",
+  "description": "Custom Bluesky media feed — images and videos from accounts you follow",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron:dev": "NODE_ENV=development electron .",
+    "build:frontend": "cd frontend && npm run build",
+    "dist": "npm run build:frontend && electron-builder"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.0"
+  },
+  "build": {
+    "appId": "ca.acorninteractive.blueskymediafeed",
+    "productName": "Bluesky Media Feed",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "backend/server.js",
+      "backend/package.json",
+      "frontend/dist/**/*",
+      "!backend/node_modules/**/*"
+    ],
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "category": "Network"
+    }
+  }
+}
