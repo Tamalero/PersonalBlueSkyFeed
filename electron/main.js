@@ -54,9 +54,8 @@ function createWindow() {
 function setupAutoUpdater(win) {
   autoUpdater.autoDownload = false;
   autoUpdater.setFeedURL({
-    provider: 'github',
-    owner: 'Tamalero',
-    repo: 'PersonalBlueSkyFeed',
+    provider: 'generic',
+    url: 'https://github.com/Tamalero/PersonalBlueSkyFeed/releases/latest/download',
   });
 
   autoUpdater.on('update-available', (info) => {

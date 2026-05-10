@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import VideoPlayer from './VideoPlayer';
 import './PostModal.css';
 
 const MAX_CHARS = 300;
@@ -122,10 +123,7 @@ function PostModal({ feedItem, onClose }) {
   } else if (embedType === 'app.bsky.embed.video#view') {
     mediaEl = (
       <div className="pm-media-wrap">
-        {post.embed.thumbnail
-          ? <img src={post.embed.thumbnail} alt="Video thumbnail" className="pm-image" />
-          : <div className="pm-video-placeholder">▶ Video</div>}
-        <div className="pm-video-badge">▶ Video — open on Bluesky to play</div>
+        <VideoPlayer src={post.embed.playlist} poster={post.embed.thumbnail} />
       </div>
     );
   } else if (embedType === 'app.bsky.embed.external#view') {

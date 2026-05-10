@@ -123,22 +123,6 @@
   text-align: center;
 }
 
-.pm-video-placeholder {
-  color: #fff;
-  font-size: 3rem;
-}
-
-.pm-video-badge {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  font-size: 0.78rem;
-  padding: 0.4rem 0.75rem;
-  text-align: center;
-}
 
 .pm-external {
   flex-direction: column;
