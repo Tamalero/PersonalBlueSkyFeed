@@ -1,9 +1,10 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
 
-// Set credentials path to the OS user-data dir so it survives app updates.
-// On Linux this is ~/.config/BlueSkyFeed/credentials.txt
+// Credentials live in the OS user-data dir so they survive app updates.
+// On Linux: ~/.config/BlueSkyFeed/credentials.txt
 app.whenReady().then(() => {
   process.env.CREDENTIALS_PATH = path.join(app.getPath('userData'), 'credentials.txt');
   process.env.NODE_ENV = 'production';
@@ -31,6 +32,49 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadURL('http://localhost:5000');
+
+  // Auto-updater only runs inside a packaged AppImage
+  if (app.isPackaged) {
+    setupAutoUpdater(win);
+  }
+}
+
+function setupAutoUpdater(win) {
+  // Ask the user before downloading — don't silently consume bandwidth
+  autoUpdater.autoDownload = false;
+
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Update Available',
+      message: `Version ${info.version} is available`,
+      detail: 'Would you like to download and install it now?',
+      buttons: ['Download', 'Later'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.downloadUpdate();
+    });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'Update downloaded',
+      detail: 'The app will restart to apply the update.',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-updater error:', err.message);
+  });
+
+  // Delay the first check so the window is fully visible before any dialog appears
+  setTimeout(() => autoUpdater.checkForUpdates(), 3000);
 }
 
 app.on('window-all-closed', () => app.quit());
