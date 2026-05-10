@@ -1,251 +1,176 @@
 # Bluesky Custom Media Feed
 
-A web application that creates a personalized Bluesky feed showing only media (images and videos) from accounts you follow or watch, including reposts of media from those accounts.
+A personalized Bluesky media browser — images and videos only, from accounts you follow, packaged as a self-contained Linux desktop AppImage.
+
+---
 
 ## Features
 
-- 🔐 Secure login with Bluesky App Passwords
-- 📸 Filters feed to show only posts with images
-- 🎥 Detects and displays videos
-- 👥 Shows posts only from accounts you follow
-- 🔄 Includes reposts of media from followed accounts
-- 🎨 Beautiful, responsive web interface
-- 🔗 Direct links to posts on Bluesky
+- **Media-only feed** — filters your timeline to posts with images, videos, or external media thumbnails; no text-only posts
+- **Follows-aware** — shows content only from accounts you follow, including their reposts of media from other accounts
+- **Infinite scroll** — automatically loads more posts as you scroll; a Load More button is also available
+- **Lightbox / PostModal** — click any post to open a full-viewport lightbox with:
+  - Full-resolution images with ‹ › carousel for multi-image posts
+  - HLS video playback via hls.js (Bluesky stores videos as `.m3u8` playlists)
+  - Like, repost, and reply without leaving the app
+  - Live stat counts (updates after interactions)
+- **External links in system browser** — "View on Bluesky" and all other external links open in your default browser, not inside the app window
+- **Auto-login** — optionally save credentials (AES-256-GCM encrypted, machine-scoped) so the app logs in automatically on next launch
+- **Auto-update** — built-in updater checks GitHub Releases on launch and prompts to install new versions; also supports GearLever / AppImageUpdate via embedded `.upd_info`
 
-## Project Structure
+---
 
+## System Requirements (AppImage)
+
+| Requirement | Details |
+|---|---|
+| OS | Any Linux x86_64 distro with **glibc ≥ 2.25** (Ubuntu 18.04+, Debian 10+, Fedora 27+, Arch, etc.) |
+| FUSE | `libfuse2` must be installed. Ubuntu 22.04+ ships fuse3 by default — run `sudo apt install libfuse2` once if the AppImage won't launch |
+| Node.js | Not required — Electron bundles its own Node.js runtime |
+| Internet | Required to reach the Bluesky API (`bsky.social`) |
+
+> CentOS / RHEL 7 (glibc 2.17) is not supported.
+
+---
+
+## Getting Started — AppImage (recommended)
+
+1. Download `Bluesky-Media-Feed-x.y.z.AppImage` from [Releases](https://github.com/Tamalero/PersonalBlueSkyFeed/releases/latest)
+2. Make it executable:
+   ```bash
+   chmod +x Bluesky-Media-Feed-x.y.z.AppImage
+   ```
+3. Run it:
+   ```bash
+   ./Bluesky-Media-Feed-x.y.z.AppImage
+   ```
+4. Log in with your Bluesky handle or email and an **App Password** (create one at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords))
+5. Optionally check **Save credentials** to enable auto-login on future launches
+
+---
+
+## Credential Storage
+
+Two formats are supported. The app tries encrypted first, then falls back to plaintext.
+
+### Encrypted (created by the app)
+When you check "Save credentials" in the login form, the app writes `credentials.enc` — an AES-256-GCM encrypted JSON file. The key is derived from your machine's hostname + username via `scrypt` and never leaves your machine.
+
+### Plaintext (manual / advanced)
+Create `credentials.txt` in the app's config directory (`~/.config/BlueSkyFeed/` when running as an AppImage):
 ```
-BlueSkyFeed/
-├── backend/              # Node.js Express API
-│   ├── server.js        # Main server and feed logic
-│   ├── package.json     # Backend dependencies
-│   └── .env.example     # Environment variables template
-├── frontend/             # React + Vite web application
-│   ├── main.jsx         # React entry point
-│   ├── App.jsx          # Main app component
-│   ├── index.html       # HTML entry point
-│   ├── vite.config.js   # Vite build configuration
-│   ├── package.json     # Frontend dependencies
-│   ├── components/      # React components
-│   │   ├── LoginForm.jsx
-│   │   ├── FeedDisplay.jsx
-│   │   └── PostCard.jsx
-│   └── styles/          # CSS files
-├── README.md            # This file
-└── .gitignore          # Git ignore rules
+handle: your.handle.bsky.social
+app: xxxx-xxxx-xxxx-xxxx
 ```
 
-## Prerequisites
+Both files are scoped to the OS user-data directory and are never uploaded anywhere.
 
-- Node.js 16+
-- npm or yarn
-- A Bluesky account
-- An app password from Bluesky (NOT your main password)
+---
 
-## Setup Instructions
+## Running in Development Mode
 
-### 1. Create an App Password
+Requires Node.js 18+ and npm.
 
-1. Go to [Bluesky Settings](https://bsky.app/settings/app-passwords)
-2. Click "Add App Password"
-3. Give it a name like "Bluesky Feed"
-4. Copy the generated password (you'll need it for login)
-
-### 2. Install Backend Dependencies
-
+**Terminal 1 — Backend** (port 5000):
 ```bash
+npm install       # install root deps (Electron + all backend deps)
 cd backend
-npm install
-```
-
-### 3. Configure Backend
-
-Create a `.env` file in the `backend` directory:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` if needed (defaults work for most users):
-
-```
-PORT=5000
-BLUESKY_SERVICE_URL=https://bsky.social
-```
-
-### 4. Install Frontend Dependencies
-
-```bash
-cd ../frontend
-npm install
-```
-
-## Running the Application
-
-### Start the Backend Server
-
-```bash
-cd backend
+npm install       # install backend-only dev deps (nodemon)
 npm start
 ```
 
-The backend will run on `http://localhost:5000`
-
-### Start the Frontend Development Server
-
-In a new terminal:
-
+**Terminal 2 — Frontend** (port 3000):
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-The frontend will run on `http://localhost:3000`
+Open `http://localhost:3000`. Vite proxies all `/api/*` requests to the backend on `:5000`.
 
-### Access the Application
-
-Open your browser and go to `http://localhost:3000`
-
-## How to Use
-
-1. **Login**: Enter your Bluesky handle or email and app password
-2. **View Feed**: Your custom media feed will load automatically
-3. **Refresh**: Click "Refresh Feed" to get the latest posts
-4. **View on Bluesky**: Click "View on Bluesky" to see posts in their original context
-5. **Logout**: Click the logout button when done
-
-## Feed Filtering Logic
-
-The application filters your timeline by:
-
-1. **Media Only**: Only shows posts with images, videos, or external media
-2. **Followed Accounts**: Only displays posts from accounts you follow
-3. **Includes Reposts**: Shows reposts/reblogs of media from followed accounts
-
-## API Endpoints
-
-### POST `/api/login`
-
-Authenticate with Bluesky
-
-**Request:**
-```json
-{
-  "handle": "your.handle",
-  "password": "app-password-here"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Logged in successfully"
-}
-```
-
-### GET `/api/feed`
-
-Fetch the filtered custom feed (requires authentication)
-
-**Response:**
-```json
-{
-  "feed": [
-    {
-      "post": { /* post object */ },
-      "reason": null  /* or repost reason */
-    }
-  ]
-}
-```
-
-### POST `/api/logout`
-
-Logout from the current session
-
-### GET `/api/health`
-
-Health check endpoint
-
-## Security Notes
-
-- ✅ Uses official Bluesky AT Protocol API
-- ✅ App password is only sent to your backend
-- ✅ HTTPS recommended for production
-- ✅ Never use your main Bluesky password
-- ⚠️ Backend stores session in memory (restart clears sessions)
-
-## Building for Production
-
-### Backend
-
+**Electron dev mode** (optional — runs the packaged window against the dev server):
 ```bash
-cd backend
-NODE_ENV=production npm start
+npm run electron:dev
 ```
 
-### Frontend
+---
 
+## Building and Releasing
+
+### Build AppImage locally (no upload)
 ```bash
-cd frontend
-npm run build
+npm run dist
+# Output: dist-electron/Bluesky-Media-Feed-x.y.z.AppImage
 ```
 
-The built files will be in `frontend/dist/`
+### Publish a new release
+```bash
+# Requires a GitHub personal access token with `repo` scope
+export GH_TOKEN=ghp_your_token_here
 
-## Environment Variables
+# 1. Bump version in package.json
+npm version patch   # or: minor | major
 
-### Backend
+# 2. Build, patch, and publish
+npm run release
+```
 
-- `PORT` - Server port (default: 5000)
-- `BLUESKY_SERVICE_URL` - Bluesky API endpoint (default: https://bsky.social)
+`npm run release` runs: build frontend → `electron-builder --publish never` → `node scripts/release.js`.
+
+`scripts/release.js` performs these steps automatically:
+- Renames the AppImage (spaces → hyphens)
+- Patches the `.upd_info` ELF section with the `gh-releases-zsync` update URL (required for GearLever)
+- Generates a `.zsync` delta file via `zsyncmake`
+- Recomputes sha512/size and updates `latest-linux.yml`
+- Creates a GitHub Release and uploads all three assets (AppImage, .zsync, latest-linux.yml)
+
+> Do not use `electron-builder --publish always` directly — it skips the `.upd_info` patch and GearLever will not see the update link.
+
+---
+
+## Security
+
+- Uses the official Bluesky AT Protocol API (`@atproto/api`) — no unofficial endpoints
+- Your credentials are sent only to `bsky.social` (never to any third party)
+- Always use an **App Password**, not your main Bluesky password
+- Saved credentials are AES-256-GCM encrypted with a key derived from your machine identity — the file is useless without the same machine account
+- CORS is restricted to `localhost:3000` in dev; disabled entirely in production (same-origin)
+- Session is in-memory — restarting the app logs you out unless credentials are saved
+
+---
 
 ## Troubleshooting
 
-### Login fails with "Invalid handle or password"
+**AppImage won't launch**
+- Make sure it's executable: `chmod +x Bluesky-Media-Feed-*.AppImage`
+- On Ubuntu 22.04+: `sudo apt install libfuse2`
 
-- Verify you're using an **app password**, not your main password
-- Check your handle/email is correct
-- Ensure the app password hasn't been revoked
+**Login fails with "Invalid handle or password"**
+- Use an **App Password**, not your main password
+- Create one at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords)
+- Check your handle is correct (e.g. `you.bsky.social`)
 
-### No posts showing in feed
+**No posts showing**
+- Make sure you follow accounts that post images or videos
+- Try clicking Refresh Feed
+- Bluesky's timeline may be sparse — the app scans up to 500 recent posts per page load
 
-- Make sure you follow accounts with media posts
-- Try refreshing the feed
-- Check the browser console for errors
+**Videos don't play**
+- Bluesky serves video as HLS (`.m3u8`); playback requires hls.js which is bundled — no extra install needed
+- If a video still won't play, use "View on Bluesky" to watch it in the browser
 
-### Backend not connecting
+**GearLever shows no update link**
+- Only AppImages built with `npm run release` (v1.4.1+) have the `.upd_info` section populated
+- Verify with: `readelf -p .upd_info Bluesky-Media-Feed-*.AppImage`
 
-- Ensure backend is running on `http://localhost:5000`
-- Check that port 5000 is not in use
-- Verify CORS is enabled
-
-### Frontend not loading
-
-- Check that frontend dev server is running on `http://localhost:3000`
-- Verify port 3000 is available
-- Clear browser cache and reload
-
-## Future Improvements
-
-- [ ] Add filtering options (date range, media type)
-- [ ] Implement persistent storage with database
-- [ ] Add dark mode
-- [ ] Export feed as RSS
-- [ ] Add advanced search/filtering
-- [ ] Implement caching for better performance
-- [ ] Add user preferences/settings
-- [ ] Create standalone desktop app
+---
 
 ## License
 
 MIT
 
-## Support
-
-For issues or feature requests, please create an issue on the GitHub repository.
+---
 
 ## Disclaimer
 
-This is an unofficial Bluesky client. Use at your own discretion and respect Bluesky's terms of service.
+This is an unofficial Bluesky client. Use at your own discretion and in accordance with [Bluesky's terms of service](https://bsky.social/about/support/tos).

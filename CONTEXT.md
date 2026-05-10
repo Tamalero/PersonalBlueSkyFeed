@@ -102,9 +102,19 @@ npm version patch   # or: minor | major
 npm run release
 ```
 
-`npm run release` builds the frontend, packages the AppImage, and publishes two assets to the GitHub Release:
-- `Bluesky.Media.Feed-x.y.z.AppImage` — the binary
-- `latest-linux.yml` — the update manifest that running instances check
+`npm run release` runs: build frontend → `electron-builder --publish never` → `node scripts/release.js`.
+
+`scripts/release.js` performs the following post-build steps before publishing:
+1. Renames the AppImage (spaces → hyphens): `Bluesky Media Feed-x.y.z.AppImage` → `Bluesky-Media-Feed-x.y.z.AppImage`
+2. Reads the `.upd_info` ELF section offset via `readelf -S` and patches it with the gh-releases-zsync update string so GearLever (and AppImageUpdate) can detect updates
+3. Runs `zsyncmake` to generate a `.zsync` delta file
+4. Recomputes sha512/size of the patched AppImage and rewrites `latest-linux.yml`
+5. Creates a GitHub Release (draft), uploads all three assets (AppImage, .zsync, latest-linux.yml), then publishes
+
+Three assets are uploaded to each GitHub Release:
+- `Bluesky-Media-Feed-x.y.z.AppImage` — the binary
+- `Bluesky-Media-Feed-x.y.z.AppImage.zsync` — delta-update file for GearLever/AppImageUpdate
+- `latest-linux.yml` — the update manifest that running instances check via electron-updater
 
 ---
 
@@ -342,6 +352,42 @@ Files bundled into the AppImage:
 - Root `node_modules/` (all production dependencies — backend + electron-updater)
 - `backend/node_modules/` is **excluded** (`!backend/node_modules/**/*`) — Node.js resolves packages up the directory tree to root `node_modules/` automatically
 
+### AppImage Portability
+
+The AppImage is **mostly self-contained**. What is bundled:
+- Entire Electron 30 / Chromium browser engine
+- Node.js runtime (Electron IS Node.js — no system Node required)
+- All JS dependencies (`express`, `@atproto/api`, `hls.js`, etc.) in `app.asar`
+- Graphics libs: `libEGL.so`, `libffmpeg.so`, `libGLESv2.so`
+- **No native `.node` addons** — all npm packages are pure JS, so there are no arch-specific compiled bindings
+
+**Minimum system requirement: glibc ≥ 2.25** (required by the Electron binary itself). Any mainstream distro from ~2018 onwards satisfies this. CentOS/RHEL 7 (glibc 2.17) does not.
+
+| Distro | glibc | Supported |
+|---|---|---|
+| Ubuntu 18.04+ | 2.27+ | ✅ |
+| Debian 10+ | 2.28+ | ✅ |
+| Fedora 27+ | 2.26+ | ✅ |
+| Arch Linux | 2.38+ (rolling) | ✅ |
+| CentOS/RHEL 7 | 2.17 | ❌ |
+
+**libfuse2 caveat**: Ubuntu 22.04+ ships with fuse3 by default. AppImage Type 2 needs `libfuse2`. Fix: `sudo apt install libfuse2`. This is a one-time setup step, not a portability failure.
+
+### `.upd_info` ELF Section and GearLever
+
+AppImage Type 2 binaries have a `.upd_info` ELF section (512 bytes). AppImage managers like **GearLever** and the **AppImageUpdate** library read this section to find the update source. `electron-builder` v24 leaves this section empty by default.
+
+`scripts/release.js` patches the section post-build with:
+```
+gh-releases-zsync|Tamalero|PersonalBlueSkyFeed|latest|Bluesky-Media-Feed-*.AppImage.zsync
+```
+This is the `gh-releases-zsync` format: `gh-releases-zsync|owner|repo|tag|zsync-filename-pattern`. After patching, GearLever shows the update link and can download updates using zsync delta transfers.
+
+To verify the section is correctly embedded:
+```bash
+readelf -p .upd_info Bluesky-Media-Feed-x.y.z.AppImage
+```
+
 ---
 
 ## Bug Fixes Applied (vs. Original Code)
@@ -457,8 +503,10 @@ await agent.post({
 9. **Vite proxy** — in dev, Vite on `:3000` proxies `/api/*` to Express on `:5000`. In production (AppImage), Express serves the built frontend directly on `:5000` — no Vite.
 10. **External links in Electron**: `setWindowOpenHandler` handles `target="_blank"` links; `will-navigate` handles in-window navigation. Both call `shell.openExternal()`. In the web browser, `target="_blank"` opens a new tab natively — no special handling needed.
 11. **Auto-updater only runs when `app.isPackaged`** — skipped entirely in dev mode.
-12. **AppImage type 2** — produced by default by `electron-builder`. Requires FUSE on the host system.
-13. **Publishing a release** requires `GH_TOKEN` env var and running `npm version` first to create a git tag.
+12. **AppImage type 2** — produced by default by `electron-builder`. Requires `libfuse2` on the host (Ubuntu 22.04+ ships fuse3; install `libfuse2` as a one-time fix).
+13. **AppImage portability** — self-contained except for glibc ≥ 2.25 (any mainstream distro from 2018+). No native `.node` addons; all deps are pure JS.
+14. **`.upd_info` ELF section** — `electron-builder` v24 leaves this empty. `scripts/release.js` patches it post-build with the `gh-releases-zsync` URL so GearLever can detect updates. Verify with `readelf -p .upd_info <file>.AppImage`.
+15. **Publishing a release** requires `GH_TOKEN` env var and running `npm version` first. The `npm run release` script handles patching, zsync generation, and GitHub upload — do NOT use `electron-builder --publish always` as it skips the `.upd_info` patch.
 
 ---
 
@@ -472,3 +520,4 @@ await agent.post({
 | 1.3.0 | 2026-05-09 | HLS video playback in lightbox via hls.js |
 | 1.3.1 | 2026-05-09 | Auto-updater fix: removed bad setFeedURL, rely on bundled app-update.yml GitHub provider |
 | 1.4.0 | 2026-05-09 | Encrypted credential storage; Save credentials checkbox in login form |
+| 1.4.1 | 2026-05-09 | Fix: patch `.upd_info` ELF section post-build so GearLever shows update link; add `scripts/release.js` release pipeline; generate `.zsync` for delta updates |
