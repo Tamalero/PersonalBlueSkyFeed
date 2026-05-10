@@ -52,8 +52,12 @@ function createWindow() {
 }
 
 function setupAutoUpdater(win) {
-  // Ask the user before downloading — don't silently consume bandwidth
   autoUpdater.autoDownload = false;
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'Tamalero',
+    repo: 'PersonalBlueSkyFeed',
+  });
 
   autoUpdater.on('update-available', (info) => {
     dialog.showMessageBox(win, {

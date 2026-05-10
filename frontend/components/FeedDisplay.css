@@ -45,6 +45,19 @@
   font-size: 0.9rem;
 }
 
+.feed-load-more-btn {
+  padding: 0.6rem 2rem;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  border-radius: 24px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.feed-load-more-btn:hover { background: #5a6fd6; }
+
 .feed-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

@@ -7,7 +7,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: 0;
   animation: pm-fade-in 0.15s ease;
 }
 
@@ -21,8 +21,9 @@
   background: #fff;
   border-radius: 14px;
   display: flex;
-  max-width: 960px;
-  width: 100%;
+  width: 90vw;
+  max-width: 90vw;
+  height: 90vh;
   max-height: 90vh;
   overflow: hidden;
   position: relative;
@@ -61,7 +62,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -73,11 +74,14 @@
   align-items: center;
   justify-content: center;
   position: relative;
+  overflow: hidden;
 }
 
 .pm-image {
   max-width: 100%;
-  max-height: 80vh;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
 }
@@ -173,6 +177,7 @@
 /* ── Right — info ────────────────────────────────────────── */
 .pm-right {
   flex: 1;
+  min-height: 0;
   padding: 1.5rem;
   overflow-y: auto;
   display: flex;
@@ -330,7 +335,7 @@
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 680px) {
-  .pm-box { flex-direction: column; max-height: 95vh; }
-  .pm-left { flex: 0 0 auto; max-height: 50vh; }
-  .pm-image { max-height: 48vh; }
+  .pm-box { flex-direction: column; width: 95vw; max-width: 95vw; height: 90vh; }
+  .pm-left { flex: 0 0 50%; height: 50%; }
+  .pm-image { max-height: 100%; }
 }

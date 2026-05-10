@@ -40,6 +40,9 @@ function FeedDisplay({ feed, loading, loadingMore, hasMore, onLoadMore, onSelect
       </div>
       <div ref={sentinelRef} className="feed-sentinel">
         {loadingMore && <div className="feed-loading-more">Loading more posts...</div>}
+        {!loadingMore && hasMore && (
+          <button className="feed-load-more-btn" onClick={onLoadMore}>Load More Posts</button>
+        )}
         {!hasMore && <div className="feed-end">You're all caught up!</div>}
       </div>
     </div>
