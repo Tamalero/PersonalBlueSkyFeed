@@ -3,6 +3,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const os = require('os');
 const { BskyAgent } = require('@atproto/api');
 
 dotenv.config();
@@ -61,20 +63,62 @@ function getFilterAuthorDid(feedItem) {
   return isRepost(feedItem) ? feedItem.reason.by.did : feedItem.post.author.did;
 }
 
+// ── Credential encryption (AES-256-GCM, key derived from machine identity) ──
+
+let _derivedKey = null;
+function getDerivedKey() {
+  if (_derivedKey) return _derivedKey;
+  let id;
+  try { id = `${os.hostname()}::${os.userInfo().username}`; }
+  catch { id = os.hostname() || 'bluesky-media-feed'; }
+  _derivedKey = crypto.scryptSync(id, 'bsf-salt-v1', 32);
+  return _derivedKey;
+}
+
+function encryptCredentials(plaintext) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getDerivedKey(), iv);
+  const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  return JSON.stringify({
+    iv: iv.toString('hex'),
+    tag: cipher.getAuthTag().toString('hex'),
+    data: enc.toString('hex'),
+  });
+}
+
+function decryptCredentials(json) {
+  const { iv, tag, data } = JSON.parse(json);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', getDerivedKey(), Buffer.from(iv, 'hex'));
+  decipher.setAuthTag(Buffer.from(tag, 'hex'));
+  return decipher.update(Buffer.from(data, 'hex')) + decipher.final('utf8');
+}
+
+function getCredPaths() {
+  const txt = process.env.CREDENTIALS_PATH || path.join(__dirname, '..', 'credentials.txt');
+  // Encrypted file lives alongside the plaintext file
+  const enc = path.join(path.dirname(txt), 'credentials.enc');
+  return { txt, enc };
+}
+
+function parseCredentialContent(content) {
+  const creds = {};
+  for (const line of content.split('\n').map(l => l.trim()).filter(Boolean)) {
+    const i = line.indexOf(':');
+    if (i === -1) continue;
+    creds[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  return creds;
+}
+
 function loadCredentials() {
   try {
-    const credPath = process.env.CREDENTIALS_PATH
-      || path.join(__dirname, '..', 'credentials.txt');
-    const content = fs.readFileSync(credPath, 'utf-8');
-    const credentials = {};
-    for (const line of content.split('\n').map(l => l.trim()).filter(Boolean)) {
-      const colonIdx = line.indexOf(':');
-      if (colonIdx === -1) continue;
-      credentials[line.slice(0, colonIdx).trim()] = line.slice(colonIdx + 1).trim();
+    const { txt, enc } = getCredPaths();
+    if (fs.existsSync(enc)) {
+      return parseCredentialContent(decryptCredentials(fs.readFileSync(enc, 'utf-8')));
     }
-    return credentials;
-  } catch (error) {
-    console.error('Error loading credentials:', error.message);
+    return parseCredentialContent(fs.readFileSync(txt, 'utf-8'));
+  } catch (err) {
+    console.error('Error loading credentials:', err.message);
     return null;
   }
 }
@@ -106,6 +150,19 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(401).json({ error: error.message || 'Login failed' });
+  }
+});
+
+app.post('/api/save-credentials', (req, res) => {
+  try {
+    const { handle, password } = req.body;
+    if (!handle || !password) return res.status(400).json({ error: 'Handle and password required' });
+    const { enc } = getCredPaths();
+    fs.writeFileSync(enc, encryptCredentials(`handle: ${handle}\napp: ${password}\n`), 'utf-8');
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Save credentials error:', err.message);
+    res.status(500).json({ error: 'Failed to save credentials' });
   }
 });
 

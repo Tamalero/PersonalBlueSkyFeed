@@ -110,6 +110,9 @@ npm run release
 
 ## Credentials System
 
+Two credential storage formats are supported. The backend tries the encrypted file first, then falls back to plaintext.
+
+### Plaintext (`credentials.txt`)
 **File**: `credentials.txt` in the project root (dev) or `~/.config/BlueSkyFeed/credentials.txt` (AppImage).
 
 **Format**:
@@ -121,7 +124,14 @@ app: xxxx-xxxx-xxxx-xxxx
 - `handle` — your Bluesky handle or email
 - `app` — an App Password from https://bsky.app/settings/app-passwords (NOT your main password)
 
-Excluded from git via `.gitignore`. In the packaged AppImage, `electron/main.js` sets `CREDENTIALS_PATH` to the OS user-data directory (`~/.config/BlueSkyFeed/`) before starting the server, so credentials survive app updates. The manual login form is always available as a fallback.
+### Encrypted (`credentials.enc`)
+**File**: `credentials.enc` alongside `credentials.txt`, created when the user checks "Save credentials" in the login form.
+
+**Encryption**: AES-256-GCM. The key is derived with `scryptSync` from `hostname::username` with salt `bsf-salt-v1`, producing a 32-byte key cached in memory after first derivation. The file is JSON: `{ iv, tag, data }` (all hex-encoded).
+
+**Security model**: Protects against theft of the file alone. Anyone with access to the same machine account can rederive the key. For a single-user personal app this is appropriate — significantly better than plaintext without requiring a master password.
+
+Both files are excluded from git via `.gitignore`. In the packaged AppImage, `electron/main.js` sets `CREDENTIALS_PATH` to the OS user-data directory (`~/.config/BlueSkyFeed/`) before starting the server, so credentials survive app updates. The manual login form is always available as a fallback.
 
 ---
 
@@ -171,6 +181,13 @@ Post a reply.
   - `text` — reply content, max 300 characters
 - **Response**: `{ success: true }`
 
+### `POST /api/save-credentials`
+Encrypts and saves credentials to `credentials.enc` using AES-256-GCM with a machine-derived key.
+- **Request**: `{ handle: "...", password: "..." }`
+- **Response**: `{ success: true }`
+- **Error**: status 400 (missing fields) or 500 (write failure)
+- Called by the frontend after a successful manual login when the user checks "Save credentials". Non-blocking — a save failure does not roll back the login.
+
 ### `POST /api/logout`
 Clears the session and the follows cache.
 - **Response**: `{ success: true, message: "..." }`
@@ -181,6 +198,9 @@ Clears the session and the follows cache.
 ---
 
 ## Backend Implementation — Key Details
+
+### Credential Encryption (`getDerivedKey`, `encryptCredentials`, `decryptCredentials`)
+Key derived once via `crypto.scryptSync(hostname::username, 'bsf-salt-v1', 32)` and cached in `_derivedKey`. AES-256-GCM with a random 12-byte IV per write. Output stored as JSON `{ iv, tag, data }` (hex). `loadCredentials()` checks for `credentials.enc` first, then falls back to `credentials.txt`.
 
 ### `hasMedia(post)`
 Checks `post.embed.$type` for **view** embed types. The `#view` suffix is what the timeline API actually returns — the bare types (without `#view`) only appear in raw AT Protocol record objects, never in `getTimeline()` responses.
@@ -285,6 +305,7 @@ Like and repost counts are updated **optimistically** (state changes immediately
 
 ### `LoginForm.jsx`
 - `useEffect` syncs the `initialError` prop into local `error` state so parent re-renders with a different error message are correctly reflected
+- "Save credentials" checkbox (`saveCredentials` state). On successful login with the box checked, calls `POST /api/save-credentials`. A 1200 ms delay before `onLoginSuccess()` lets the user read the save confirmation message. Save failure is non-blocking — the login still completes, but a warning is shown instead of the success message.
 
 ---
 
@@ -447,3 +468,7 @@ await agent.post({
 |---------|------|-------|
 | 1.0.0 | 2026-05-09 | Initial release — media feed with infinite scroll, Electron AppImage, GitHub auto-updates |
 | 1.1.0 | 2026-05-09 | PostModal lightbox with like/repost/reply; external links routed to system browser |
+| 1.2.0 | 2026-05-09 | Load More button; lightbox expanded to 90% viewport; explicit auto-update URL |
+| 1.3.0 | 2026-05-09 | HLS video playback in lightbox via hls.js |
+| 1.3.1 | 2026-05-09 | Auto-updater fix: removed bad setFeedURL, rely on bundled app-update.yml GitHub provider |
+| 1.4.0 | 2026-05-09 | Encrypted credential storage; Save credentials checkbox in login form |
