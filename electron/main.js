@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
@@ -32,6 +32,18 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadURL('http://localhost:5000');
+
+  // Open all external links in the system browser, not inside the app window
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('http://localhost:5000')) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
 
   // Auto-updater only runs inside a packaged AppImage
   if (app.isPackaged) {

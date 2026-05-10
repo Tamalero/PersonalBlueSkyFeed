@@ -8,6 +8,8 @@
   flex-direction: column;
   height: 100%;
   position: relative;
+  cursor: pointer;
+  user-select: none;
 }
 
 .post-card:hover {

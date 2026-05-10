@@ -145,6 +145,61 @@ app.get('/api/feed', async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+function requireAuth(req, res) {
+  if (!agent) { res.status(401).json({ error: 'Not authenticated' }); return false; }
+  return true;
+}
+
+app.post('/api/like', async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  try {
+    const { uri, cid } = req.body;
+    const { uri: likeUri } = await agent.like(uri, cid);
+    res.json({ likeUri });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/like', async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  try {
+    await agent.deleteLike(req.body.likeUri);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/repost', async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  try {
+    const { uri, cid } = req.body;
+    const { uri: repostUri } = await agent.repost(uri, cid);
+    res.json({ repostUri });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/repost', async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  try {
+    await agent.deleteRepost(req.body.repostUri);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/reply', async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  try {
+    const { parentUri, parentCid, rootUri, rootCid, text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'Reply text is required' });
+    await agent.post({
+      text: text.trim(),
+      reply: {
+        root: { uri: rootUri, cid: rootCid },
+        parent: { uri: parentUri, cid: parentCid },
+      },
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/logout', (req, res) => {
   agent = null;
   followsCache = null;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
 import FeedDisplay from './components/FeedDisplay';
+import PostModal from './components/PostModal';
 import './App.css';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
   const [hasMore, setHasMore] = useState(true);
   const [autoLoginError, setAutoLoginError] = useState(null);
   const [feedError, setFeedError] = useState(null);
+  const [selectedPost, setSelectedPost] = useState(null);
 
   useEffect(() => {
     autoLogin();
@@ -132,11 +134,16 @@ function App() {
               loadingMore={loadingMore}
               hasMore={hasMore}
               onLoadMore={loadMore}
+              onSelectPost={setSelectedPost}
             />
           </>
         )}
       </main>
     </div>
+
+    {selectedPost && (
+      <PostModal feedItem={selectedPost} onClose={() => setSelectedPost(null)} />
+    )}
   );
 }
 

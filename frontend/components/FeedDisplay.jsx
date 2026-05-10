@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import PostCard from './PostCard';
 import './FeedDisplay.css';
 
-function FeedDisplay({ feed, loading, loadingMore, hasMore, onLoadMore }) {
+function FeedDisplay({ feed, loading, loadingMore, hasMore, onLoadMore, onSelectPost }) {
   const sentinelRef = useRef(null);
   // Keep a stable ref to the latest callback so the observer never needs recreation
   const onLoadMoreRef = useRef(onLoadMore);
@@ -35,7 +35,7 @@ function FeedDisplay({ feed, loading, loadingMore, hasMore, onLoadMore }) {
     <div className="feed-container">
       <div className="feed-grid">
         {feed.map((item) => (
-          <PostCard key={item.post.uri} post={item.post} reason={item.reason} />
+          <PostCard key={item.post.uri} post={item.post} reason={item.reason} onSelect={() => onSelectPost(item)} />
         ))}
       </div>
       <div ref={sentinelRef} className="feed-sentinel">

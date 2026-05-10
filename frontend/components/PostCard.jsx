@@ -1,7 +1,7 @@
 import './PostCard.css';
 
-function PostCard({ post, reason }) {
-  const isRepost = reason && reason.$type === 'app.bsky.feed.defs#reasonRepost';
+function PostCard({ post, reason, onSelect }) {
+  const isRepost = reason?.$type === 'app.bsky.feed.defs#reasonRepost';
   const embedType = post.embed?.$type;
 
   let mediaUrl = null;
@@ -21,11 +21,13 @@ function PostCard({ post, reason }) {
 
   const authorName = post.author.displayName || post.author.handle;
   const postTime = new Date(post.record.createdAt).toLocaleDateString();
+  const bskyUrl = `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`;
 
   return (
-    <div className="post-card">
+    <div className="post-card" onClick={onSelect} role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(); }}>
       {isRepost && <div className="repost-badge">🔄 Repost</div>}
-      
+
       <div className="post-media">
         {mediaUrl ? (
           <img src={mediaUrl} alt="Post media" className="media-image" />
@@ -60,11 +62,13 @@ function PostCard({ post, reason }) {
 
         <p className="post-date">{postTime}</p>
 
+        {/* Stop propagation so this link doesn't open the modal */}
         <a
-          href={`https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`}
+          href={bskyUrl}
           target="_blank"
           rel="noreferrer"
           className="view-link"
+          onClick={(e) => e.stopPropagation()}
         >
           View on Bluesky →
         </a>
