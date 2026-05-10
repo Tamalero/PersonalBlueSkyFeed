@@ -97,6 +97,7 @@ function App() {
   };
 
   return (
+    <>
     <div className="app">
       <header className="app-header">
         <h1>📸 Bluesky Media Feed</h1>
@@ -144,6 +145,7 @@ function App() {
     {selectedPost && (
       <PostModal feedItem={selectedPost} onClose={() => setSelectedPost(null)} />
     )}
+    </>
   );
 }
 
